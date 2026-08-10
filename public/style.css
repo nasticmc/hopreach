@@ -336,6 +336,34 @@ header .subtitle {
   accent-color: var(--accent);
 }
 
+.elevation-legend {
+  width: min(360px, calc(100vw - 32px));
+  max-width: none;
+}
+.elevation-legend-bar {
+  height: 12px;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 6px;
+}
+.elevation-legend-labels {
+  position: relative;
+  height: 1.15rem;
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+.elevation-legend-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.elevation-legend-labels span:nth-child(1) { left: 0; transform: none; }
+.elevation-legend-labels span:nth-child(2) { left: 6.67%; }
+.elevation-legend-labels span:nth-child(3) { left: 20%; }
+.elevation-legend-labels span:nth-child(4) { left: 33.33%; }
+.elevation-legend-labels span:nth-child(5) { left: 60%; }
+.elevation-legend-labels span:nth-child(6) { right: 0; transform: none; }
+
 .scope-filter-control {
   background: var(--card-bg);
   color: var(--text);

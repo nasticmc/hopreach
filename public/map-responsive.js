@@ -430,11 +430,34 @@
     const elevationHeatmap = window.HopReachElevationHeatmap.createLayer(L);
     elevationHeatmap.addTo(map);
     layersControl.addOverlay(elevationHeatmap, "Elevation heatmap");
+    const elevationLegend = L.control({ position: "bottomleft" });
+    elevationLegend.onAdd = function () {
+      const div = L.DomUtil.create("div", "legend elevation-legend");
+      div.innerHTML = `
+        <div class="legend-title">Ground elevation</div>
+        <div class="elevation-legend-bar"></div>
+        <div class="elevation-legend-labels">
+          <span>−500 m</span><span>0</span><span>1,000</span><span>2,000</span><span>4,000</span><span>7,000+ m</span>
+        </div>`;
+      div.querySelector(".elevation-legend-bar").style.background =
+        window.HopReachElevationHeatmap.legendGradient();
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
+      return div;
+    };
+    elevationLegend.addTo(map);
+    map.on("overlayadd", (event) => {
+      if (event.layer === elevationHeatmap && !elevationLegend.getContainer()) elevationLegend.addTo(map);
+    });
+    map.on("overlayremove", (event) => {
+      if (event.layer === elevationHeatmap && elevationLegend.getContainer()) elevationLegend.remove();
+    });
     // The api literal below is evaluated at module load, when this is still
     // undefined, so publishing it has to happen here — after it exists and
     // before init() returns the object the caller destructures.
     api.layersControl = layersControl;
     api.elevationHeatmap = elevationHeatmap;
+    api.elevationLegend = elevationLegend;
     bindDom();
     return api;
   }
@@ -446,6 +469,7 @@
     // layersControl is filled in by init(); see the note there.
     layersControl: undefined,
     elevationHeatmap: undefined,
+    elevationLegend: undefined,
   };
   return api;
 });
