@@ -307,15 +307,16 @@ header .subtitle {
 .legend-bar {
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(90deg, #f9a8d4, #c026d3);
+  background: linear-gradient(90deg, #3b82f6, #9333ea);
   margin-bottom: 0.25rem;
 }
 .legend-labels {
   display: flex;
-  justify-content: space-between;
   color: var(--text-muted);
   font-size: 0.68rem;
 }
+.legend-labels span { width: 50%; }
+.legend-labels span:last-child { text-align: right; }
 .legend-note {
   margin-top: 0.4rem;
   color: var(--text-muted);
@@ -340,10 +341,23 @@ header .subtitle {
   width: min(360px, calc(100vw - 32px));
   max-width: none;
 }
+.elevation-legend-scale { position: relative; }
 .elevation-legend-bar {
   height: 12px;
   border: 1px solid rgba(255,255,255,0.35);
   border-radius: 6px;
+}
+.elevation-legend-ticks {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 1px;
+}
+.elevation-legend-ticks i {
+  width: 1px;
+  height: 12px;
+  background: rgba(255,255,255,0.75);
 }
 .elevation-legend-labels {
   position: relative;
@@ -355,14 +369,14 @@ header .subtitle {
 .elevation-legend-labels span {
   position: absolute;
   transform: translateX(-50%);
+  text-align: center;
   white-space: nowrap;
 }
 .elevation-legend-labels span:nth-child(1) { left: 0; transform: none; }
-.elevation-legend-labels span:nth-child(2) { left: 9.09%; }
-.elevation-legend-labels span:nth-child(3) { left: 22.73%; }
-.elevation-legend-labels span:nth-child(4) { left: 36.36%; }
-.elevation-legend-labels span:nth-child(5) { left: 63.64%; }
-.elevation-legend-labels span:nth-child(6) { right: 0; transform: none; }
+.elevation-legend-labels span:nth-child(2) { left: 25%; }
+.elevation-legend-labels span:nth-child(3) { left: 50%; }
+.elevation-legend-labels span:nth-child(4) { left: 75%; }
+.elevation-legend-labels span:nth-child(5) { right: 0; transform: none; }
 
 .scope-filter-control {
   background: var(--card-bg);

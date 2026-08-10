@@ -435,9 +435,14 @@
       const div = L.DomUtil.create("div", "legend elevation-legend");
       div.innerHTML = `
         <div class="legend-title">Ground elevation</div>
-        <div class="elevation-legend-bar"></div>
+        <div class="elevation-legend-scale">
+          <div class="elevation-legend-bar"></div>
+          <div class="elevation-legend-ticks" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i>
+          </div>
+        </div>
         <div class="elevation-legend-labels">
-          <span class="elevation-min">−500 m</span><span class="elevation-max">5,000 m</span>
+          <span>−500 m</span><span>875 m</span><span>2,250 m</span><span>3,625 m</span><span>5,000 m</span>
         </div>`;
       div.querySelector(".elevation-legend-bar").style.background =
         window.HopReachElevationHeatmap.legendGradient();
@@ -451,8 +456,10 @@
       if (!container) return;
       const roundedMin = Math.floor(min / 10) * 10;
       const roundedMax = Math.ceil(max / 10) * 10;
-      container.querySelector(".elevation-min").textContent = `${roundedMin.toLocaleString()} m`;
-      container.querySelector(".elevation-max").textContent = `${roundedMax.toLocaleString()} m`;
+      container.querySelectorAll(".elevation-legend-labels span").forEach((label, index) => {
+        const metres = Math.round((roundedMin + (roundedMax - roundedMin) * index / 4) / 10) * 10;
+        label.textContent = `${metres.toLocaleString()} m`;
+      });
       container.querySelector(".elevation-legend-bar").style.background =
         window.HopReachElevationHeatmap.legendGradient(roundedMin, roundedMax);
     });

@@ -43,6 +43,8 @@ test("elevation heatmap renders below RF coverage and can be toggled", async ({ 
   await expect(row).toBeAttached();
   await expect(page.locator(".elevation-legend")).toBeVisible();
   await expect(page.locator(".elevation-legend-labels")).toContainText("5,000+ m");
+  await expect(page.locator(".elevation-legend-ticks i")).toHaveCount(5);
+  await expect(page.locator(".elevation-legend-labels span")).toHaveCount(5);
   await row.locator('input[type="checkbox"]').uncheck();
   await expect.poll(() => page.evaluate(() =>
     window.MCCoverageMap.map.hasLayer(window.MapResponsive.elevationHeatmap)
@@ -53,7 +55,7 @@ test("elevation heatmap renders below RF coverage and can be toggled", async ({ 
 test("coverage legend uses the signal palette", async ({ page }) => {
   const bar = page.locator(".legend:not(.elevation-legend) .legend-bar");
   await expect(bar).toBeVisible();
-  await expect(bar).toHaveCSS("background-image", /rgb\(249, 168, 212\).*rgb\(192, 38, 211\)/);
+  await expect(bar).toHaveCSS("background-image", /rgb\(59, 130, 246\).*rgb\(147, 51, 234\)/);
 });
 
 test("progress.json is well-formed JSON with a known stage", async ({ page, request }) => {
