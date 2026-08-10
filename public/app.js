@@ -595,13 +595,35 @@
     S.filteredCoverageWorker.onmessage = (e) => {
       const msg = e.data;
       if (msg.generation !== S.filteredCoverageGeneration || S.positionMode !== "filtered") return;
-      if (msg.type === "result") renderFilteredCoverageResult(msg);
-      else if (msg.type === "error") {
+      if (msg.type === "status") updateFilteredCoverageProgress(msg.message);
+      else if (msg.type === "progress") {
+        const percent = msg.total > 0 ? Math.round((msg.done / msg.total) * 100) : 0;
+        updateFilteredCoverageProgress(`Calculating filtered coverage… ${percent}%`, percent);
+      } else if (msg.type === "result") {
+        renderFilteredCoverageResult(msg);
+        hideFilteredCoverageProgress();
+      } else if (msg.type === "error") {
+        hideFilteredCoverageProgress();
         console.error("Filtered coverage calculation failed:", msg.message);
         showError(`Could not calculate filtered coverage: ${msg.message}`);
       }
     };
     return S.filteredCoverageWorker;
+  }
+
+  function updateFilteredCoverageProgress(message, percent = null) {
+    const indicator = document.getElementById("filtered-coverage-progress");
+    if (!indicator) return;
+    indicator.classList.remove("hidden");
+    indicator.querySelector("span").textContent = message;
+    const progress = indicator.querySelector("progress");
+    if (percent == null) progress.removeAttribute("value");
+    else progress.value = percent;
+  }
+
+  function hideFilteredCoverageProgress() {
+    const indicator = document.getElementById("filtered-coverage-progress");
+    if (indicator) indicator.classList.add("hidden");
   }
 
   function requestFilteredCoverage() {
@@ -624,6 +646,26 @@
         imageWidth: FILTERED_COVERAGE_WIDTH,
       });
     }, FILTERED_COVERAGE_DEBOUNCE_MS);
+  }
+
+  // The filtered raster is calculated asynchronously. Replace the current
+  // server-rendered union layer with an empty filtered layer before starting
+  // that work, rather than leaving "Estimated coverage" painted over the map
+  // until the worker replies. Besides making the mode switch truthful right
+  // away, the placeholder preserves the layer's visible/hidden state for
+  // renderFilteredCoverageResult (including manual and Simulate-mode toggles).
+  function prepareFilteredCoverageLayer() {
+    updateFilteredCoverageProgress("Preparing filtered coverage…");
+    let coverageWasVisible = !scopeFilterActive() && !S.simDeclutterSnapshot;
+    if (S.coverageLayer) {
+      coverageWasVisible = map.hasLayer(S.coverageLayer);
+      layersControl.removeLayer(S.coverageLayer);
+      map.removeLayer(S.coverageLayer);
+    }
+    S.coverageTileOverlays = [];
+    S.coverageLayer = L.layerGroup();
+    if (coverageWasVisible) S.coverageLayer.addTo(map);
+    layersControl.addOverlay(S.coverageLayer, "Filtered coverage");
   }
 
   function renderFilteredCoverageResult(msg) {
@@ -673,6 +715,7 @@
     const cm = currentCoverageMeta();
     if (!cm || !cm.tiles || cm.tiles.length === 0) return;
     if (S.positionMode === "filtered") {
+      prepareFilteredCoverageLayer();
       addCoverageLegend(cm.frequency_mhz);
       requestFilteredCoverage();
       return;
@@ -748,7 +791,13 @@
     S.positionModeControl.onAdd = function () {
       const div = L.DomUtil.create("div", "position-mode-control");
       const options = available.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
-      div.innerHTML = window.HopReachMapControls.collapsibleHtml("Map detail", `<select id="position-mode-select">${options}</select>`, "map-detail");
+      const body = `
+        <select id="position-mode-select">${options}</select>
+        <div id="filtered-coverage-progress" class="filtered-coverage-progress hidden" role="status" aria-live="polite">
+          <span>Preparing filtered coverage…</span>
+          <progress max="100"></progress>
+        </div>`;
+      div.innerHTML = window.HopReachMapControls.collapsibleHtml("Map detail", body, "map-detail");
       L.DomEvent.disableClickPropagation(div);
       window.HopReachMapControls.wireCollapsible(div);
       const select = div.querySelector("#position-mode-select");
@@ -757,7 +806,10 @@
         S.positionMode = e.target.value;
         localStorage.setItem(POSITION_MODE_KEY, S.positionMode);
         renderFilteredRepeaters();
-        if (S.positionMode !== "filtered") applyCoverageLayer();
+        if (S.positionMode !== "filtered") {
+          hideFilteredCoverageProgress();
+          applyCoverageLayer();
+        }
       });
       return div;
     };

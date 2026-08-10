@@ -438,6 +438,20 @@ header .subtitle {
   font-size: 0.75rem;
 }
 
+.filtered-coverage-progress {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.filtered-coverage-progress.hidden { display: none; }
+.filtered-coverage-progress progress {
+  width: 100%;
+  height: 7px;
+  accent-color: #3b82f6;
+}
+
 .map-display-control {
   background: var(--card-bg);
   color: var(--text);

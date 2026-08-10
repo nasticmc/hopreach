@@ -203,6 +203,16 @@ test("map detail defaults to Calibrated Precision, resetting an old saved prefer
   );
   expect(migrationKey).toBeTruthy();
 
+  // Filtered coverage is calculated in a debounced worker. The previous
+  // server-rendered union must nevertheless disappear synchronously, or it
+  // masks the filtered result while that calculation is running.
+  await page.selectOption("#position-mode-select", "filtered");
+  await expect(page.locator("#filtered-coverage-progress")).toBeVisible();
+  await expect(page.locator("#filtered-coverage-progress")).toContainText("Preparing filtered coverage");
+  const coverageLayerLabels = await page.locator(".leaflet-control-layers-overlays label").allTextContents();
+  expect(coverageLayerLabels.some((label) => label.includes("Estimated coverage"))).toBe(false);
+  expect(coverageLayerLabels.some((label) => label.includes("Filtered coverage"))).toBe(true);
+
   // A returning visitor with an old saved preference, predating the
   // migration flag, gets reset to the new default exactly once.
   await page.evaluate(() => {
