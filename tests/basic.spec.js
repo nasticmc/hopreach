@@ -28,6 +28,25 @@ test("site loads, map renders, WASM ready, no unexpected console errors", async 
   expect(unexpected, `unexpected console/page errors:\n${unexpected.join("\n")}`).toEqual([]);
 });
 
+test("elevation heatmap renders below RF coverage and can be toggled", async ({ page }) => {
+  await gotoReady(page);
+
+  const state = await page.evaluate(() => ({
+    elevationZ: Number(window.MCCoverageMap.map.getPane("elevationPane").style.zIndex),
+    coverageZ: Number(window.MCCoverageMap.map.getPane("overlayPane").style.zIndex),
+    visible: window.MCCoverageMap.map.hasLayer(window.MapResponsive.elevationHeatmap),
+  }));
+  expect(state.visible).toBe(true);
+  expect(state.elevationZ).toBeLessThan(state.coverageZ);
+
+  const row = page.locator(".leaflet-control-layers-overlays label", { hasText: "Elevation heatmap" });
+  await expect(row).toBeAttached();
+  await row.locator('input[type="checkbox"]').uncheck();
+  await expect.poll(() => page.evaluate(() =>
+    window.MCCoverageMap.map.hasLayer(window.MapResponsive.elevationHeatmap)
+  )).toBe(false);
+});
+
 test("progress.json is well-formed JSON with a known stage", async ({ page, request }) => {
   await page.goto("/");
   const resp = await request.get("/data/progress.json");

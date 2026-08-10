@@ -421,10 +421,20 @@
     ({ NARROW_VIEWPORT_PX, map } = context);
     layersControl = L.control.layers(
       baseLayers, {}, { collapsed: true, position: "topright" }).addTo(map);
+    // Terrain tint sits above every opaque basemap but below overlayPane,
+    // where the RF coverage rasters are rendered. Keeping these as separate
+    // panes makes their ordering stable regardless of toggle order.
+    map.createPane("elevationPane");
+    map.getPane("elevationPane").style.zIndex = 350;
+    map.getPane("elevationPane").style.pointerEvents = "none";
+    const elevationHeatmap = window.HopReachElevationHeatmap.createLayer(L);
+    elevationHeatmap.addTo(map);
+    layersControl.addOverlay(elevationHeatmap, "Elevation heatmap");
     // The api literal below is evaluated at module load, when this is still
     // undefined, so publishing it has to happen here — after it exists and
     // before init() returns the object the caller destructures.
     api.layersControl = layersControl;
+    api.elevationHeatmap = elevationHeatmap;
     bindDom();
     return api;
   }
@@ -435,6 +445,7 @@
     initialBasemap,
     // layersControl is filled in by init(); see the note there.
     layersControl: undefined,
+    elevationHeatmap: undefined,
   };
   return api;
 });
