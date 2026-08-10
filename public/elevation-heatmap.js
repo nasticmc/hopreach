@@ -15,29 +15,16 @@
     return red * 256 + green + blue / 256 - 32768;
   }
 
-  // A deliberately wide cool-to-violet palette. RF coverage uses orange ->
-  // green, so neither of those hues appears here: terrain and signal remain
-  // distinguishable even when both translucent layers are enabled. Extra
-  // stops make modest height changes much easier to see than the old compact
-  // seven-colour hypsometric ramp. The scale tops out at 2,500 m: Australia's
-  // highest terrain is below that, so reserving most of the palette for
-  // elevations that cannot occur there made useful differences too subtle.
-  // Values above the final stop clamp to its colour. Interpolation avoids
-  // contour-like bands.
+  // A compact hypsometric palette: deep water -> lowland green -> upland
+  // ochre -> alpine white. Interpolation avoids hard contour-like bands.
   const STOPS = [
-    [-500, [7, 20, 38]],
-    [0, [16, 42, 86]],
-    [100, [22, 78, 155]],
-    [250, [18, 111, 196]],
-    [500, [20, 155, 215]],
-    [750, [80, 199, 232]],
-    [1000, [185, 230, 242]],
-    [1250, [196, 181, 253]],
-    [1500, [139, 92, 246]],
-    [1750, [109, 40, 217]],
-    [2000, [162, 28, 175]],
-    [2250, [232, 121, 249]],
-    [2500, [253, 244, 255]],
+    [-500, [22, 50, 73]],
+    [0, [45, 92, 79]],
+    [250, [90, 133, 86]],
+    [750, [178, 160, 92]],
+    [1500, [157, 105, 72]],
+    [3000, [210, 202, 188]],
+    [5000, [255, 255, 255]],
   ];
 
   function legendGradient() {
