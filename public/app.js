@@ -161,6 +161,9 @@
   // "unscoped" is a synthetic option matching repeaters with neither a
   // reported nor an observed scope at all, not a literal region value.
   const scopeFilterState = {};
+  const nodeFilterState = { query: "", statuses: [] };
+  let nodeFilterControlBody = null;
+  let nodeFilterCount = null;
 
   // A repeater's real scope(s) for filtering/coverage purposes — a real
   // MeshCore repeater can have more than one region enabled at once, so
@@ -173,16 +176,15 @@
   // folded in too in case it names a region the observation window missed.
   // Empty array means no scope is known at all.
   function repeaterScopesOf(props) {
-    const scopes = new Set(props.observed_scopes || props.inferred_scopes || []);
-    if (props.default_scope) scopes.add(props.default_scope);
-    return Array.from(scopes);
+    return window.HopReachNodeFilter.scopesOf(props);
   }
 
   function matchesScopeFilter(props) {
-    const checked = Object.keys(scopeFilterState).filter((k) => scopeFilterState[k]);
-    if (checked.length === 0) return true;
-    const scopes = repeaterScopesOf(props);
-    return checked.some((code) => (code === "unscoped" ? scopes.length === 0 : scopes.includes(code)));
+    return window.HopReachNodeFilter.matches(props, {
+      query: nodeFilterState.query,
+      statuses: nodeFilterState.statuses,
+      scopes: Object.keys(scopeFilterState).filter((k) => scopeFilterState[k]),
+    });
   }
 
   function scopeFilterActive() {
@@ -203,6 +205,44 @@
   // layer's own reliability, rather than depending on the browser's own
   // compute for a potentially slow live raster.
   const scopeOverlayGroups = new Map(); // scope name -> L.layerGroup (of its own tiles)
+
+  function initNodeFilterControl() {
+    const control = L.control({ position: "topright" });
+    control.onAdd = function () {
+      const div = L.DomUtil.create("div", "scope-filter-control node-filter-control");
+      const body = `
+        <input class="node-filter-search" type="search" placeholder="Name, key or scope…" aria-label="Search repeaters">
+        <div class="node-filter-statuses" aria-label="Filter by status">
+          ${["active", "degraded", "silent"].map((status) => `<label><input type="checkbox" data-status="${status}"> ${status}</label>`).join("")}
+        </div>
+        <div class="node-filter-scopes"></div>
+        <div class="node-filter-footer"><span class="node-filter-count">All nodes</span><button type="button" class="node-filter-clear">Clear</button></div>`;
+      div.innerHTML = window.HopReachMapControls.collapsibleHtml("Search & filter nodes", body, "node-filter");
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
+      window.HopReachMapControls.wireCollapsible(div);
+      nodeFilterControlBody = div.querySelector(".node-filter-scopes");
+      nodeFilterCount = div.querySelector(".node-filter-count");
+      const search = div.querySelector(".node-filter-search");
+      search.addEventListener("input", () => { nodeFilterState.query = search.value; renderFilteredRepeaters(); });
+      div.querySelectorAll("[data-status]").forEach((input) => input.addEventListener("change", () => {
+        nodeFilterState.statuses = Array.from(div.querySelectorAll("[data-status]:checked"), (el) => el.dataset.status);
+        renderFilteredRepeaters();
+      }));
+      div.querySelector(".node-filter-clear").addEventListener("click", () => {
+        search.value = "";
+        nodeFilterState.query = "";
+        nodeFilterState.statuses = [];
+        div.querySelectorAll("input[type=checkbox]").forEach((input) => { input.checked = false; });
+        Object.keys(scopeFilterState).forEach((name) => { scopeFilterState[name] = false; clearScopeOverlay(name); });
+        if (!S.simDeclutterSnapshot) setCoverageVisible(true);
+        renderFilteredRepeaters();
+      });
+      return div;
+    };
+    control.addTo(map);
+  }
+  initNodeFilterControl();
 
   function clearScopeOverlay(name) {
     const group = scopeOverlayGroups.get(name);
@@ -273,16 +313,12 @@
     for (const name of regionNames) scopeFilterState[name] = false;
     scopeFilterState["unscoped"] = false;
 
-    const scopeFilterControl = L.control({ position: "topright" });
-    scopeFilterControl.onAdd = function () {
-      const div = L.DomUtil.create("div", "scope-filter-control");
-      const rows =
+    if (!nodeFilterControlBody) return;
+    const rows =
         regionNames.map((name) => `<label><input type="checkbox" data-scope="${escapeHtml(name)}"> ${escapeHtml(name)}</label>`).join("") +
         `<label><input type="checkbox" data-scope="unscoped"> Unscoped</label>`;
-      div.innerHTML = window.HopReachMapControls.collapsibleHtml("Filter by region scope", rows, "region-scope-filter");
-      L.DomEvent.disableClickPropagation(div);
-      window.HopReachMapControls.wireCollapsible(div);
-      div.querySelectorAll("input[type=checkbox]").forEach((input) => {
+    nodeFilterControlBody.innerHTML = `<div class="node-filter-subtitle">Coverage by region</div>${rows}`;
+      nodeFilterControlBody.querySelectorAll("input[type=checkbox]").forEach((input) => {
         input.addEventListener("change", (e) => {
           const name = e.target.dataset.scope;
           const wasFiltering = scopeFilterActive();
@@ -306,9 +342,6 @@
           }
         });
       });
-      return div;
-    };
-    scopeFilterControl.addTo(map);
   }
   initScopeFilterControl();
 
@@ -480,6 +513,7 @@
   function renderFilteredRepeaters(fitBounds) {
     if (!S.currentGeojson) return;
     const filtered = { type: "FeatureCollection", features: S.currentGeojson.features.filter((f) => matchesScopeFilter(f.properties)) };
+    if (nodeFilterCount) nodeFilterCount.textContent = `${filtered.features.length} of ${S.currentGeojson.features.length} nodes`;
 
     if (S.clusters) {
       map.removeLayer(S.clusters);
