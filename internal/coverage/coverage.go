@@ -1,6 +1,6 @@
 // Package coverage renders best-server RF coverage heatmaps: at each pixel
 // it finds the repeater giving the strongest signal margin (after terrain
-// diffraction loss) and colours from orange (just barely covered) to green
+// diffraction loss) and colours from pink (just barely covered) to magenta
 // (comfortably covered), fully transparent where no repeater's link budget
 // reaches with positive margin. Computation goes through a
 // compute.Engine (local GPU, remote GPU, or CPU) rather than calling
@@ -52,12 +52,14 @@ func RasterBounds(points []Point, rangeKm float64) (propagation.Bounds, bool) {
 }
 
 // marginsToImage colours a raw margins buffer (as produced by
-// propagation.ComputeMarginsCPU or the GPU path) from orange (just barely
-// covered) to green (comfortably covered, marginDB >= p.MarginGreenDB),
-// fully transparent wherever the margin is NaN.
+// propagation.ComputeMarginsCPU or the GPU path) from pink (just barely
+// covered) to magenta (comfortably covered, marginDB >= p.MarginGreenDB).
+// This deliberately avoids the greens and earth tones used by the elevation
+// heatmap, keeping RF strength legible when both layers are enabled.
+// Pixels are fully transparent wherever the margin is NaN.
 func marginsToImage(margins []float32, imageWidth, imageHeight int, p propagation.Params, maxAlpha uint8) *image.NRGBA {
-	orange := [3]float64{249, 115, 22}
-	green := [3]float64{34, 197, 94}
+	pink := [3]float64{249, 168, 212}
+	magenta := [3]float64{192, 38, 211}
 
 	img := image.NewNRGBA(image.Rect(0, 0, imageWidth, imageHeight))
 	for py := 0; py < imageHeight; py++ {
@@ -75,9 +77,9 @@ func marginsToImage(margins []float32, imageWidth, imageHeight int, p propagatio
 			if t < 0 {
 				t = 0
 			}
-			r := orange[0] + t*(green[0]-orange[0])
-			g := orange[1] + t*(green[1]-orange[1])
-			b := orange[2] + t*(green[2]-orange[2])
+			r := pink[0] + t*(magenta[0]-pink[0])
+			g := pink[1] + t*(magenta[1]-pink[1])
+			b := pink[2] + t*(magenta[2]-pink[2])
 
 			img.SetNRGBA(px, py, color.NRGBA{
 				R: uint8(r), G: uint8(g), B: uint8(b), A: maxAlpha,

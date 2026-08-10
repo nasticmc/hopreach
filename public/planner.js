@@ -482,7 +482,7 @@
     const ctx = canvas.getContext("2d");
     const imgData = ctx.createImageData(imageWidth, imageHeight);
 
-    // Blue -> purple, distinct from the real coverage map's orange->green,
+    // Blue -> purple, distinct from the real coverage map's pink->magenta,
     // so "existing" and "proposed" read as different things when both are
     // shown at once.
     const blue = [56, 189, 248];
