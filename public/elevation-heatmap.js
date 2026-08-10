@@ -19,7 +19,11 @@
   // green, so neither of those hues appears here: terrain and signal remain
   // distinguishable even when both translucent layers are enabled. Extra
   // stops make modest height changes much easier to see than the old compact
-  // seven-colour hypsometric ramp. Interpolation avoids contour-like bands.
+  // seven-colour hypsometric ramp. The scale tops out at 2,500 m: Australia's
+  // highest terrain is below that, so reserving most of the palette for
+  // elevations that cannot occur there made useful differences too subtle.
+  // Values above the final stop clamp to its colour. Interpolation avoids
+  // contour-like bands.
   const STOPS = [
     [-500, [7, 20, 38]],
     [0, [16, 42, 86]],
@@ -28,12 +32,12 @@
     [500, [20, 155, 215]],
     [750, [80, 199, 232]],
     [1000, [185, 230, 242]],
-    [1500, [196, 181, 253]],
-    [2000, [139, 92, 246]],
-    [3000, [109, 40, 217]],
-    [4000, [162, 28, 175]],
-    [5000, [232, 121, 249]],
-    [7000, [253, 244, 255]],
+    [1250, [196, 181, 253]],
+    [1500, [139, 92, 246]],
+    [1750, [109, 40, 217]],
+    [2000, [162, 28, 175]],
+    [2250, [232, 121, 249]],
+    [2500, [253, 244, 255]],
   ];
 
   function legendGradient() {
