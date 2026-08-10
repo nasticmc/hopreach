@@ -437,7 +437,7 @@
         <div class="legend-title">Ground elevation</div>
         <div class="elevation-legend-bar"></div>
         <div class="elevation-legend-labels">
-          <span>−500 m</span><span>0</span><span>500</span><span>1,000</span><span>1,500</span><span>2,000</span><span>2,500+ m</span>
+          <span>−500 m</span><span>0</span><span>750</span><span>1,500</span><span>3,000</span><span>5,000+ m</span>
         </div>`;
       div.querySelector(".elevation-legend-bar").style.background =
         window.HopReachElevationHeatmap.legendGradient();

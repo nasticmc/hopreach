@@ -307,7 +307,7 @@ header .subtitle {
 .legend-bar {
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(90deg, #f97316, #22c55e);
+  background: linear-gradient(90deg, #f9a8d4, #c026d3);
   margin-bottom: 0.25rem;
 }
 .legend-labels {
@@ -358,12 +358,11 @@ header .subtitle {
   white-space: nowrap;
 }
 .elevation-legend-labels span:nth-child(1) { left: 0; transform: none; }
-.elevation-legend-labels span:nth-child(2) { left: 16.67%; }
-.elevation-legend-labels span:nth-child(3) { left: 33.33%; }
-.elevation-legend-labels span:nth-child(4) { left: 50%; }
-.elevation-legend-labels span:nth-child(5) { left: 66.67%; }
-.elevation-legend-labels span:nth-child(6) { left: 83.33%; }
-.elevation-legend-labels span:nth-child(7) { right: 0; transform: none; }
+.elevation-legend-labels span:nth-child(2) { left: 9.09%; }
+.elevation-legend-labels span:nth-child(3) { left: 22.73%; }
+.elevation-legend-labels span:nth-child(4) { left: 36.36%; }
+.elevation-legend-labels span:nth-child(5) { left: 63.64%; }
+.elevation-legend-labels span:nth-child(6) { right: 0; transform: none; }
 
 .scope-filter-control {
   background: var(--card-bg);
