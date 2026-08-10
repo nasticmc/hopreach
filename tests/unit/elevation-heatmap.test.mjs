@@ -33,3 +33,9 @@ test("stretches colours across a supplied viewport range", () => {
   assert.deepEqual(heatmap.elevationColor(100, { min: 100, max: 300 }), [22, 50, 73]);
   assert.deepEqual(heatmap.elevationColor(300, { min: 100, max: 300 }), [255, 255, 255]);
 });
+
+test("caps the viewport gradient floor at 20 metres below sea level", () => {
+  const range = heatmap.gradientRange(-500, 300);
+  assert.deepEqual(range, { min: -20, max: 300 });
+  assert.deepEqual(heatmap.elevationColor(-500, range), heatmap.elevationColor(-20, range));
+});
