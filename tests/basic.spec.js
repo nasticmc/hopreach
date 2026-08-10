@@ -41,10 +41,13 @@ test("elevation heatmap renders below RF coverage and can be toggled", async ({ 
 
   const row = page.locator(".leaflet-control-layers-overlays label", { hasText: "Elevation heatmap" });
   await expect(row).toBeAttached();
+  await expect(page.locator(".elevation-legend")).toBeVisible();
+  await expect(page.locator(".elevation-legend-labels")).toContainText("7,000+ m");
   await row.locator('input[type="checkbox"]').uncheck();
   await expect.poll(() => page.evaluate(() =>
     window.MCCoverageMap.map.hasLayer(window.MapResponsive.elevationHeatmap)
   )).toBe(false);
+  await expect(page.locator(".elevation-legend")).toHaveCount(0);
 });
 
 test("progress.json is well-formed JSON with a known stage", async ({ page, request }) => {
