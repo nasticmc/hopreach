@@ -28,3 +28,8 @@ test("colorizes pixels while preserving source alpha", () => {
   const result = heatmap.colorizeTerrarium(new Uint8ClampedArray([128, 0, 0, 177]));
   assert.deepEqual([...result], [45, 92, 79, 177]);
 });
+
+test("stretches colours across a supplied viewport range", () => {
+  assert.deepEqual(heatmap.elevationColor(100, { min: 100, max: 300 }), [22, 50, 73]);
+  assert.deepEqual(heatmap.elevationColor(300, { min: 100, max: 300 }), [255, 255, 255]);
+});
