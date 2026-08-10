@@ -25,13 +25,13 @@ self.onmessage = async (e) => {
   // this is one load — connect-repeaters checks its finished route with
   // the simulator, see checkRoute.
   await Propagation.ready; // wasm/main.go's exports must be registered before any handler below touches them
-  await MeshSim.ready;
+  if (e.data.kind === "connect" || e.data.kind === "area-coverage") await MeshSim.ready;
   if (e.data.kind === "connect") return handleConnect(e.data);
   if (e.data.kind === "area-coverage") return handleAreaCoverage(e.data);
   return handlePreview(e.data);
 };
 
-async function handlePreview({ generation, sites, realRepeaters, config, imageWidth }) {
+async function handlePreview({ generation, sites, realRepeaters, config, imageWidth, coverageOnly = false }) {
 
   if (!sites || sites.length === 0) {
     self.postMessage({ generation, type: "result", empty: true });
@@ -83,7 +83,7 @@ async function handlePreview({ generation, sites, realRepeaters, config, imageWi
       const kmPerDegLon = Math.max(1, 111.32 * Math.cos((r.lat * Math.PI) / 180));
       return r.lat >= bounds.south && r.lat <= bounds.north && r.lon >= bounds.west && r.lon <= bounds.east && kmPerDegLon > 0;
     });
-    for (const s of resolvedSites) {
+    for (const s of coverageOnly ? [] : resolvedSites) {
       const candidates = [];
       for (const other of resolvedSites) {
         if (other.id === s.id) continue;

@@ -118,6 +118,8 @@
     { value: "filtered", label: "Filtered" },
   ];
   const CALIBRATED_MODES = new Set(["calibrated", "calibrated_precision"]);
+  const FILTERED_COVERAGE_WIDTH = 320;
+  const FILTERED_COVERAGE_DEBOUNCE_MS = 250;
 
   // Default "Map detail" is Calibrated Precision (the most accurate tier)
   // when it's actually available — ensurePositionModeControl falls back to
@@ -499,7 +501,7 @@
         </div>
         <div class="map-control-body${noteCollapsed ? " hidden" : ""}">
           <div class="legend-note">${filteredMode
-            ? "Live maximum-search-range envelopes for only the nodes shown by Search & filter. Switch to a computed tier for terrain-aware signal strength."
+            ? "Live terrain-aware signal strength recalculated for only the nodes shown by Search & filter. Preview range is capped at 35 km for responsive updates."
             : "Terrain-aware estimate (free-space path loss + knife-edge diffraction over real elevation data). Best server per point — not foliage/building-aware."}</div>
         </div>
       `;
@@ -587,6 +589,78 @@
     return S.currentMeta.coverage[S.positionMode] || S.currentMeta.coverage.standard;
   }
 
+  function ensureFilteredCoverageWorker() {
+    if (S.filteredCoverageWorker) return S.filteredCoverageWorker;
+    S.filteredCoverageWorker = new Worker("planner-worker.js");
+    S.filteredCoverageWorker.onmessage = (e) => {
+      const msg = e.data;
+      if (msg.generation !== S.filteredCoverageGeneration || S.positionMode !== "filtered") return;
+      if (msg.type === "result") renderFilteredCoverageResult(msg);
+      else if (msg.type === "error") {
+        console.error("Filtered coverage calculation failed:", msg.message);
+        showError(`Could not calculate filtered coverage: ${msg.message}`);
+      }
+    };
+    return S.filteredCoverageWorker;
+  }
+
+  function requestFilteredCoverage() {
+    clearTimeout(S.filteredCoverageTimer);
+    const generation = ++S.filteredCoverageGeneration;
+    S.filteredCoverageTimer = setTimeout(() => {
+      if (S.positionMode !== "filtered" || !S.currentGeojson) return;
+      const sites = S.currentGeojson.features.filter((feature) => matchesScopeFilter(feature.properties)).map((feature) => {
+        const props = feature.properties;
+        const coords = feature.geometry.coordinates;
+        const position = displayedLatLng(props, L.latLng(coords[1], coords[0]));
+        return { id: props.public_key, lat: position.lat, lon: position.lng, antennaHeightM: props.antenna_height_m };
+      });
+      ensureFilteredCoverageWorker().postMessage({
+        generation,
+        coverageOnly: true,
+        sites,
+        realRepeaters: [],
+        config: { demTileURLBase: cfg.demTileURLBase, demZoom: cfg.demZoom, propagation: cfg.propagation },
+        imageWidth: FILTERED_COVERAGE_WIDTH,
+      });
+    }, FILTERED_COVERAGE_DEBOUNCE_MS);
+  }
+
+  function renderFilteredCoverageResult(msg) {
+    let coverageWasVisible = !scopeFilterActive() && !S.simDeclutterSnapshot;
+    if (S.coverageLayer) {
+      coverageWasVisible = map.hasLayer(S.coverageLayer);
+      layersControl.removeLayer(S.coverageLayer);
+      map.removeLayer(S.coverageLayer);
+    }
+    S.coverageTileOverlays = [];
+    if (!msg.empty) {
+      const margins = new Float32Array(msg.margins);
+      const canvas = document.createElement("canvas");
+      canvas.width = msg.imageWidth;
+      canvas.height = msg.imageHeight;
+      const ctx = canvas.getContext("2d");
+      const pixels = ctx.createImageData(msg.imageWidth, msg.imageHeight);
+      const blue = [59, 130, 246];
+      const purple = [147, 51, 234];
+      for (let i = 0; i < margins.length; i++) {
+        if (Number.isNaN(margins[i])) continue;
+        const t = Math.max(0, Math.min(1, margins[i] / msg.marginGreenDb));
+        const p = i * 4;
+        pixels.data[p] = blue[0] + t * (purple[0] - blue[0]);
+        pixels.data[p + 1] = blue[1] + t * (purple[1] - blue[1]);
+        pixels.data[p + 2] = blue[2] + t * (purple[2] - blue[2]);
+        pixels.data[p + 3] = 190;
+      }
+      ctx.putImageData(pixels, 0, 0);
+      const b = msg.bounds;
+      S.coverageTileOverlays = [L.imageOverlay(canvas.toDataURL("image/png"), [[b.south, b.west], [b.north, b.east]], { interactive: false })];
+    }
+    S.coverageLayer = L.layerGroup(S.coverageTileOverlays);
+    if (coverageWasVisible) S.coverageLayer.addTo(map);
+    layersControl.addOverlay(S.coverageLayer, "Filtered coverage");
+  }
+
   // Coverage rasters are served pre-split into a grid of tiles (see
   // writeCoverageTiles in main.go), not one giant image: a single
   // Precision-resolution PNG can run into tens of thousands of pixels on
@@ -598,6 +672,11 @@
   function applyCoverageLayer() {
     const cm = currentCoverageMeta();
     if (!cm || !cm.tiles || cm.tiles.length === 0) return;
+    if (S.positionMode === "filtered") {
+      addCoverageLegend(cm.frequency_mhz);
+      requestFilteredCoverage();
+      return;
+    }
     // Rebuilding must not resurrect a layer that's currently meant to be
     // hidden (Simulate mode's declutter, an active scope filter, or a plain
     // manual untick) — a background meta refresh lands whenever a run
@@ -625,27 +704,7 @@
     // nearest-neighbour rendering keeps every tier's boundary at its real,
     // unshifted position relative to every other — worth the coarser
     // tiers looking blockier when zoomed in past their native resolution.
-    if (S.positionMode === "filtered") {
-      // A live, search-driven layer cannot use the nightly union raster:
-      // that image has already lost which transmitter won each pixel.
-      // Draw each currently-visible transmitter's configured RF search
-      // envelope instead. This makes the Filtered tier respond immediately
-      // to name/status/scope searches and, importantly, never attributes
-      // hidden nodes' reach to the filtered result.
-      const radiusM = cm.max_search_range_km * 1000;
-      const visible = S.currentGeojson ? S.currentGeojson.features.filter((feature) => matchesScopeFilter(feature.properties)) : [];
-      S.coverageTileOverlays = visible.map((feature) => {
-        const coords = feature.geometry.coordinates;
-        return L.circle(displayedLatLng(feature.properties, L.latLng(coords[1], coords[0])), {
-          radius: radiusM,
-          stroke: false,
-          fillColor: "#22c55e",
-          fillOpacity: 0.16,
-          interactive: false,
-          renderer: L.canvas({ padding: 0.5 }),
-        });
-      });
-    } else S.coverageTileOverlays = cm.tiles.map((t) => {
+    S.coverageTileOverlays = cm.tiles.map((t) => {
       const b = t.bounds;
       const overlay = L.imageOverlay(`data/${t.image}?t=${Date.parse(S.currentMeta.generated_at)}`, [[b.South, b.West], [b.North, b.East]], {
         opacity: 1,
@@ -659,7 +718,7 @@
     });
     S.coverageLayer = L.layerGroup(S.coverageTileOverlays);
     if (coverageWasVisible) S.coverageLayer.addTo(map);
-    layersControl.addOverlay(S.coverageLayer, S.positionMode === "filtered" ? "Filtered coverage" : "Estimated coverage");
+    layersControl.addOverlay(S.coverageLayer, "Estimated coverage");
     addCoverageLegend(cm.frequency_mhz);
   }
 
@@ -698,7 +757,7 @@
         S.positionMode = e.target.value;
         localStorage.setItem(POSITION_MODE_KEY, S.positionMode);
         renderFilteredRepeaters();
-        applyCoverageLayer();
+        if (S.positionMode !== "filtered") applyCoverageLayer();
       });
       return div;
     };
