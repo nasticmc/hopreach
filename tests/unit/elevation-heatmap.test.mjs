@@ -1,0 +1,21 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import heatmap from "../../public/elevation-heatmap.js";
+
+test("decodes Terrarium RGB elevation values", () => {
+  assert.equal(heatmap.terrariumElevation(128, 0, 0), 0);
+  assert.equal(heatmap.terrariumElevation(129, 244, 0), 500);
+  assert.equal(heatmap.terrariumElevation(127, 255, 128), -0.5);
+});
+
+test("maps elevation to a continuous, clamped hypsometric palette", () => {
+  assert.deepEqual(heatmap.elevationColor(-1000), [22, 50, 73]);
+  assert.deepEqual(heatmap.elevationColor(0), [45, 92, 79]);
+  assert.deepEqual(heatmap.elevationColor(500), [134, 147, 89]);
+  assert.deepEqual(heatmap.elevationColor(6000), [255, 255, 255]);
+});
+
+test("colorizes pixels while preserving source alpha", () => {
+  const result = heatmap.colorizeTerrarium(new Uint8ClampedArray([128, 0, 0, 177]));
+  assert.deepEqual([...result], [45, 92, 79, 177]);
+});
