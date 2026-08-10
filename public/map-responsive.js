@@ -437,7 +437,7 @@
         <div class="legend-title">Ground elevation</div>
         <div class="elevation-legend-bar"></div>
         <div class="elevation-legend-labels">
-          <span>−500 m</span><span>0</span><span>750</span><span>1,500</span><span>3,000</span><span>5,000+ m</span>
+          <span class="elevation-min">−500 m</span><span class="elevation-max">5,000 m</span>
         </div>`;
       div.querySelector(".elevation-legend-bar").style.background =
         window.HopReachElevationHeatmap.legendGradient();
@@ -446,6 +446,16 @@
       return div;
     };
     elevationLegend.addTo(map);
+    elevationHeatmap.on("rangechange", ({ min, max }) => {
+      const container = elevationLegend.getContainer();
+      if (!container) return;
+      const roundedMin = Math.floor(min / 10) * 10;
+      const roundedMax = Math.ceil(max / 10) * 10;
+      container.querySelector(".elevation-min").textContent = `${roundedMin.toLocaleString()} m`;
+      container.querySelector(".elevation-max").textContent = `${roundedMax.toLocaleString()} m`;
+      container.querySelector(".elevation-legend-bar").style.background =
+        window.HopReachElevationHeatmap.legendGradient(roundedMin, roundedMax);
+    });
     map.on("overlayadd", (event) => {
       if (event.layer === elevationHeatmap && !elevationLegend.getContainer()) elevationLegend.addTo(map);
     });

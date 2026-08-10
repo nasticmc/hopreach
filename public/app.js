@@ -115,6 +115,7 @@
     { value: "calibrated", label: "Calibrated" },
     { value: "precision", label: "Precision" },
     { value: "calibrated_precision", label: "Calibrated Precision" },
+    { value: "filtered", label: "Filtered" },
   ];
   const CALIBRATED_MODES = new Set(["calibrated", "calibrated_precision"]);
 
@@ -483,8 +484,9 @@
       // shared map-control-header/collapsibleHtml default of expanded —
       // this one specific control wants the opposite starting state).
       const noteCollapsed = localStorage.getItem("hopreach.mapControlCollapsed.legend-note") !== "0";
+      const filteredMode = S.positionMode === "filtered";
       div.innerHTML = `
-        <div class="legend-title">Estimated coverage (${freqMHz} MHz)</div>
+        <div class="legend-title">${filteredMode ? "Filtered node range" : "Estimated coverage"} (${freqMHz} MHz)</div>
         <div class="legend-bar"></div>
         <div class="legend-labels"><span>marginal signal</span><span>strong signal</span></div>
         <div class="legend-opacity">
@@ -496,13 +498,18 @@
           <span class="map-control-chevron">${noteCollapsed ? "▸" : "▾"}</span>
         </div>
         <div class="map-control-body${noteCollapsed ? " hidden" : ""}">
-          <div class="legend-note">Terrain-aware estimate (free-space path loss + knife-edge diffraction over real elevation data). Best server per point — not foliage/building-aware.</div>
+          <div class="legend-note">${filteredMode
+            ? "Live maximum-search-range envelopes for only the nodes shown by Search & filter. Switch to a computed tier for terrain-aware signal strength."
+            : "Terrain-aware estimate (free-space path loss + knife-edge diffraction over real elevation data). Best server per point — not foliage/building-aware."}</div>
         </div>
       `;
       L.DomEvent.disableClickPropagation(div);
       L.DomEvent.disableScrollPropagation(div);
       div.querySelector("#coverage-opacity").addEventListener("input", (e) => {
-        S.coverageTileOverlays.forEach((o) => o.setOpacity(e.target.value / 100));
+        S.coverageTileOverlays.forEach((o) => {
+          if (o.setOpacity) o.setOpacity(e.target.value / 100);
+          else if (o.setStyle) o.setStyle({ fillOpacity: 0.16 * e.target.value / 100 });
+        });
       });
       window.HopReachMapControls.wireCollapsible(div);
       return div;
@@ -545,6 +552,7 @@
     if (typeof window.onRepeatersLoaded === "function") {
       window.onRepeatersLoaded(filtered, layer);
     }
+    if (S.positionMode === "filtered" && S.currentMeta) applyCoverageLayer();
   }
 
   function setClusteringDisabled(disabled) {
@@ -575,6 +583,7 @@
   // server-side, or an older meta.json predates it).
   function currentCoverageMeta() {
     if (!S.currentMeta || !S.currentMeta.coverage) return null;
+    if (S.positionMode === "filtered") return S.currentMeta.coverage.standard;
     return S.currentMeta.coverage[S.positionMode] || S.currentMeta.coverage.standard;
   }
 
@@ -616,7 +625,27 @@
     // nearest-neighbour rendering keeps every tier's boundary at its real,
     // unshifted position relative to every other — worth the coarser
     // tiers looking blockier when zoomed in past their native resolution.
-    S.coverageTileOverlays = cm.tiles.map((t) => {
+    if (S.positionMode === "filtered") {
+      // A live, search-driven layer cannot use the nightly union raster:
+      // that image has already lost which transmitter won each pixel.
+      // Draw each currently-visible transmitter's configured RF search
+      // envelope instead. This makes the Filtered tier respond immediately
+      // to name/status/scope searches and, importantly, never attributes
+      // hidden nodes' reach to the filtered result.
+      const radiusM = cm.max_search_range_km * 1000;
+      const visible = S.currentGeojson ? S.currentGeojson.features.filter((feature) => matchesScopeFilter(feature.properties)) : [];
+      S.coverageTileOverlays = visible.map((feature) => {
+        const coords = feature.geometry.coordinates;
+        return L.circle(displayedLatLng(feature.properties, L.latLng(coords[1], coords[0])), {
+          radius: radiusM,
+          stroke: false,
+          fillColor: "#22c55e",
+          fillOpacity: 0.16,
+          interactive: false,
+          renderer: L.canvas({ padding: 0.5 }),
+        });
+      });
+    } else S.coverageTileOverlays = cm.tiles.map((t) => {
       const b = t.bounds;
       const overlay = L.imageOverlay(`data/${t.image}?t=${Date.parse(S.currentMeta.generated_at)}`, [[b.South, b.West], [b.North, b.East]], {
         opacity: 1,
@@ -630,7 +659,7 @@
     });
     S.coverageLayer = L.layerGroup(S.coverageTileOverlays);
     if (coverageWasVisible) S.coverageLayer.addTo(map);
-    layersControl.addOverlay(S.coverageLayer, "Estimated coverage");
+    layersControl.addOverlay(S.coverageLayer, S.positionMode === "filtered" ? "Filtered coverage" : "Estimated coverage");
     addCoverageLegend(cm.frequency_mhz);
   }
 
@@ -640,7 +669,7 @@
   // there's no coverage data at all (shouldn't normally happen, standard is
   // always computed whenever there's any repeater to cover).
   function ensurePositionModeControl(coverage) {
-    const available = MAP_DETAIL_OPTIONS.filter((o) => coverage && coverage[o.value]);
+    const available = MAP_DETAIL_OPTIONS.filter((o) => coverage && (o.value === "filtered" ? coverage.standard : coverage[o.value]));
     if (available.length === 0) {
       if (S.positionModeControl) {
         map.removeControl(S.positionModeControl);

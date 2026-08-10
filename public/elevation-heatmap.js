@@ -35,7 +35,15 @@
     ).join(", ")})`;
   }
 
-  function elevationColor(metres) {
+  function elevationColor(metres, range) {
+    // Stretch the complete palette across the elevations in the current
+    // viewport. Keeping this transform here means tiles and the legend use
+    // precisely the same scale rather than merely relabelling fixed colours.
+    if (range && range.max > range.min) {
+      const paletteMin = STOPS[0][0];
+      const paletteMax = STOPS[STOPS.length - 1][0];
+      metres = paletteMin + (metres - range.min) / (range.max - range.min) * (paletteMax - paletteMin);
+    }
     let upper = 1;
     while (upper < STOPS.length && metres > STOPS[upper][0]) upper++;
     if (upper === STOPS.length) return [...STOPS[STOPS.length - 1][1]];
@@ -45,10 +53,10 @@
     return lowColor.map((channel, i) => Math.round(channel + (highColor[i] - channel) * t));
   }
 
-  function colorizeTerrarium(rgba) {
+  function colorizeTerrarium(rgba, range) {
     const output = rgba.slice();
     for (let i = 0; i < rgba.length; i += 4) {
-      const color = elevationColor(terrariumElevation(rgba[i], rgba[i + 1], rgba[i + 2]));
+      const color = elevationColor(terrariumElevation(rgba[i], rgba[i + 1], rgba[i + 2]), range);
       output[i] = color[0];
       output[i + 1] = color[1];
       output[i + 2] = color[2];
@@ -71,8 +79,10 @@
             const context = canvas.getContext("2d", { willReadFrequently: true });
             context.drawImage(image, 0, 0, TILE_SIZE, TILE_SIZE);
             const pixels = context.getImageData(0, 0, TILE_SIZE, TILE_SIZE);
-            pixels.data.set(colorizeTerrarium(pixels.data));
+            canvas._hopreachElevationPixels = pixels.data.slice();
+            pixels.data.set(colorizeTerrarium(canvas._hopreachElevationPixels));
             context.putImageData(pixels, 0, 0);
+            this._scheduleRescale();
             done(null, canvas);
           } catch (error) {
             done(error, canvas);
@@ -84,6 +94,48 @@
           .replace("{x}", coords.x)
           .replace("{y}", coords.y);
         return canvas;
+      },
+      onAdd(map) {
+        L.GridLayer.prototype.onAdd.call(this, map);
+        this._rescaleHandler = () => this._scheduleRescale();
+        map.on("move zoom", this._rescaleHandler);
+      },
+      onRemove(map) {
+        map.off("move zoom", this._rescaleHandler);
+        L.GridLayer.prototype.onRemove.call(this, map);
+      },
+      _scheduleRescale() {
+        if (this._rescaleFrame) cancelAnimationFrame(this._rescaleFrame);
+        this._rescaleFrame = requestAnimationFrame(() => this._rescaleVisibleTiles());
+      },
+      _rescaleVisibleTiles() {
+        const mapRect = this._map.getContainer().getBoundingClientRect();
+        const canvases = Array.from(this.getContainer().querySelectorAll("canvas")).filter((canvas) => {
+          if (!canvas._hopreachElevationPixels) return false;
+          const rect = canvas.getBoundingClientRect();
+          return rect.right > mapRect.left && rect.left < mapRect.right && rect.bottom > mapRect.top && rect.top < mapRect.bottom;
+        });
+        if (!canvases.length) return;
+        let min = Infinity;
+        let max = -Infinity;
+        for (const canvas of canvases) {
+          const raw = canvas._hopreachElevationPixels;
+          for (let i = 0; i < raw.length; i += 16) {
+            const metres = terrariumElevation(raw[i], raw[i + 1], raw[i + 2]);
+            if (metres < min) min = metres;
+            if (metres > max) max = metres;
+          }
+        }
+        if (!isFinite(min) || !isFinite(max)) return;
+        if (max <= min) max = min + 1;
+        const range = { min, max };
+        for (const canvas of canvases) {
+          const context = canvas.getContext("2d", { willReadFrequently: true });
+          const image = context.createImageData(TILE_SIZE, TILE_SIZE);
+          image.data.set(colorizeTerrarium(canvas._hopreachElevationPixels, range));
+          context.putImageData(image, 0, 0);
+        }
+        this.fire("rangechange", range);
       },
     });
     return new HeatmapLayer({
