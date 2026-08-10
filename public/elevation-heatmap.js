@@ -10,6 +10,7 @@
 
   const TILE_SIZE = 256;
   const DEFAULT_URL = "/dem-tiles/{z}/{x}/{y}.png";
+  const MIN_GRADIENT_ELEVATION_M = -20;
 
   function terrariumElevation(red, green, blue) {
     return red * 256 + green + blue / 256 - 32768;
@@ -63,6 +64,12 @@
       output[i + 3] = rgba[i + 3];
     }
     return output;
+  }
+
+  function gradientRange(min, max) {
+    min = Math.max(min, MIN_GRADIENT_ELEVATION_M);
+    if (max <= min) max = min + 1;
+    return { min, max };
   }
 
   function createLayer(L, options = {}) {
@@ -127,8 +134,9 @@
           }
         }
         if (!isFinite(min) || !isFinite(max)) return;
-        if (max <= min) max = min + 1;
-        const range = { min, max };
+        // Deep water should not consume most of the viewport's colour range.
+        // Treat everything below 20 m under sea level as the gradient floor.
+        const range = gradientRange(min, max);
         for (const canvas of canvases) {
           const context = canvas.getContext("2d", { willReadFrequently: true });
           const image = context.createImageData(TILE_SIZE, TILE_SIZE);
@@ -147,5 +155,5 @@
     });
   }
 
-  return { colorizeTerrarium, createLayer, elevationColor, legendGradient, terrariumElevation };
+  return { colorizeTerrarium, createLayer, elevationColor, gradientRange, legendGradient, terrariumElevation };
 });
