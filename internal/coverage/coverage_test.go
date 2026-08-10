@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image/color"
 	"image/png"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +15,24 @@ import (
 	"hopreach/internal/demgrid"
 	"hopreach/internal/propagation"
 )
+
+func TestMarginsToImageUsesTerrainDistinctPalette(t *testing.T) {
+	p := propagation.Params{MarginGreenDB: 20}
+	img := marginsToImage([]float32{float32(math.NaN()), 0, 10, 20, 30}, 5, 1, p, 190)
+
+	want := []color.NRGBA{
+		{},
+		{R: 249, G: 168, B: 212, A: 190},
+		{R: 220, G: 103, B: 211, A: 190},
+		{R: 192, G: 38, B: 211, A: 190},
+		{R: 192, G: 38, B: 211, A: 190},
+	}
+	for x, expected := range want {
+		if got := img.NRGBAAt(x, 0); got != expected {
+			t.Errorf("pixel %d = %#v, want %#v", x, got, expected)
+		}
+	}
+}
 
 // flatTerrainServer serves every /{z}/{x}/{y}.png request the same
 // terrarium-encoded 256x256 tile, decoding to a flat elevM everywhere —
