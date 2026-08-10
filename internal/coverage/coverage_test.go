@@ -22,10 +22,10 @@ func TestMarginsToImageUsesTerrainDistinctPalette(t *testing.T) {
 
 	want := []color.NRGBA{
 		{},
-		{R: 249, G: 168, B: 212, A: 190},
-		{R: 220, G: 103, B: 211, A: 190},
-		{R: 192, G: 38, B: 211, A: 190},
-		{R: 192, G: 38, B: 211, A: 190},
+		{R: 59, G: 130, B: 246, A: 190},
+		{R: 103, G: 90, B: 240, A: 190},
+		{R: 147, G: 51, B: 234, A: 190},
+		{R: 147, G: 51, B: 234, A: 190},
 	}
 	for x, expected := range want {
 		if got := img.NRGBAAt(x, 0); got != expected {

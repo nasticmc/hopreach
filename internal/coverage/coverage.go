@@ -52,14 +52,14 @@ func RasterBounds(points []Point, rangeKm float64) (propagation.Bounds, bool) {
 }
 
 // marginsToImage colours a raw margins buffer (as produced by
-// propagation.ComputeMarginsCPU or the GPU path) from pink (just barely
-// covered) to magenta (comfortably covered, marginDB >= p.MarginGreenDB).
+// propagation.ComputeMarginsCPU or the GPU path) from blue (just barely
+// covered) to purple (comfortably covered, marginDB >= p.MarginGreenDB).
 // This deliberately avoids the greens and earth tones used by the elevation
 // heatmap, keeping RF strength legible when both layers are enabled.
 // Pixels are fully transparent wherever the margin is NaN.
 func marginsToImage(margins []float32, imageWidth, imageHeight int, p propagation.Params, maxAlpha uint8) *image.NRGBA {
-	pink := [3]float64{249, 168, 212}
-	magenta := [3]float64{192, 38, 211}
+	blue := [3]float64{59, 130, 246}
+	purple := [3]float64{147, 51, 234}
 
 	img := image.NewNRGBA(image.Rect(0, 0, imageWidth, imageHeight))
 	for py := 0; py < imageHeight; py++ {
@@ -77,9 +77,9 @@ func marginsToImage(margins []float32, imageWidth, imageHeight int, p propagatio
 			if t < 0 {
 				t = 0
 			}
-			r := pink[0] + t*(magenta[0]-pink[0])
-			g := pink[1] + t*(magenta[1]-pink[1])
-			b := pink[2] + t*(magenta[2]-pink[2])
+			r := blue[0] + t*(purple[0]-blue[0])
+			g := blue[1] + t*(purple[1]-blue[1])
+			b := blue[2] + t*(purple[2]-blue[2])
 
 			img.SetNRGBA(px, py, color.NRGBA{
 				R: uint8(r), G: uint8(g), B: uint8(b), A: maxAlpha,
